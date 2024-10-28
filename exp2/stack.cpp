@@ -1,184 +1,232 @@
 #include <iostream>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <map>
-#include <functional>
 #include <cctype>
-#include <stdexcept>
 #include <cmath>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <map>
+
+using namespace std;
 
 template <typename T>
 class Stack {
 public:
-    void push(const T& item) {
-        items.push_back(item);
-    }
-
-    T pop() {
-        if (is_empty()) {
-            throw std::out_of_range("Stack is empty");
-        }
-        T item = items.back();
-        items.pop_back();
-        return item;
-    }
-
-    bool is_empty() const {
-        return items.empty();
-    }
-
-    size_t size() const {
-        return items.size();
-    }
-
-    T peek() const {
-        if (is_empty()) {
-            throw std::out_of_range("Stack is empty");
-        }
-        return items.back();
-    }
-
+    Stack(int size);
+    ~Stack();
+    bool IsEmpty() { return top == -1; }
+    bool IsFull() { return top == maxTop; }
+    T Top();
+    void Push(const T x);
+    T Pop();
 private:
-    std::vector<T> items;
+    int maxTop;
+    int top;
+    T* values;
 };
 
-class StringCalculator {
-public:
-    StringCalculator() {
-        operators['+'] = {1, [](double a, double b) { return a + b; }};
-        operators['-'] = {1, [](double a, double b) { return a - b; }};
-        operators['*'] = {2, [](double a, double b) { return a * b; }};
-        operators['/'] = {2, [](double a, double b) { return a / b; }};
+template <typename T>
+Stack<T>::Stack(int size) {
+    maxTop = size - 1;
+    values = new T[size];
+    top = -1;
+}
+
+template <typename T>
+Stack<T>::~Stack() {
+    delete[] values;
+}
+
+template <typename T>
+void Stack<T>::Push(const T x) {
+    if (IsFull())
+        cout << "Error: the stack is full." << endl;
+    else
+        values[++top] = x;
+}
+
+template <typename T>
+T Stack<T>::Pop() {
+    if (IsEmpty()) {
+        cout << "Error: the stack is empty." << endl;
+        return T();
+    } else {
+        return values[top--];
     }
+}
 
-    double calculate(const std::string& expression) {
-        std::vector<std::string> tokens = tokenize(expression);
-        std::vector<std::string> output;
-        Stack<std::string> op_stack;
+template <typename T>
+T Stack<T>::Top() {
+    if (IsEmpty()) {
+        cout << "Error: the stack is empty." << endl;
+        return T();
+    } else {
+        return values[top];
+    }
+}
 
-        for (const auto& token : tokens) {
-            if (isdigit(token[0]) || (token.size() > 1 && isdigit(token[1]))) {
-                output.push_back(token);
-            } else if (operators.count(token[0])) {
-                while (!op_stack.is_empty() && op_stack.peek() != "(" &&
-                       precedence(op_stack.peek()[0]) >= precedence(token[0])) {
-                    output.push_back(op_stack.pop());
+// 运算符优先级表
+const int N_OPTR = 9;
+const char pri[N_OPTR][N_OPTR] = {
+    {'>', '>', '<', '<', '<', '<', '<', '>', '>'},
+    {'>', '>', '<', '<', '<', '<', '<', '>', '>'},
+    {'>', '>', '>', '>', '<', '<', '<', '>', '>'},
+    {'>', '>', '>', '>', '<', '<', '<', '>', '>'},
+    {'>', '>', '>', '>', '>', '<', '<', '>', '>'},
+    {'>', '>', '>', '>', '>', '>', ' ', '>', '>'},
+    {'<', '<', '<', '<', '<', '<', '<', '=', ' '},
+    {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+    {'<', '<', '<', '<', '<', '<', '<', ' ', '='}
+};
+
+int optrIndex(char op) {
+    switch (op) {
+        case '+': return 0;
+        case '-': return 1;
+        case '*': return 2;
+        case '/': return 3;
+        case '^': return 4;
+        case '!': return 5;
+        case '(': return 6;
+        case ')': return 7;
+        case '\0': return 8;
+        default: return -1;
+    }
+}
+
+char getPriority(char topOp, char currentOp) {
+    int i = optrIndex(topOp);
+    int j = optrIndex(currentOp);
+    if (i == -1 || j == -1) {
+        cout << "错误的运算符" << endl;
+        exit(-1);
+    }
+    return pri[i][j];
+}
+
+double factorial(int n) {
+    if (n < 0) {
+        cout << "Error: Negative factorial" << endl;
+        exit(-1);
+    }
+    double result = 1;
+    for (int i = 1; i <= n; ++i) {
+        result *= i;
+    }
+    return result;
+}
+
+double calcu(double operand1, char op, double operand2 = 0) {
+    switch (op) {
+        case '+': return operand1 + operand2;
+        case '-': return operand1 - operand2;
+        case '*': return operand1 * operand2;
+        case '/':
+            if (operand2 == 0) {
+                cout << "Error: Division by zero" << endl;
+                exit(-1);
+            }
+            return operand1 / operand2;
+        case '^': return pow(operand1, operand2);
+        default:
+            cout << "Error: Unknown operator" << endl;
+            exit(-1);
+    }
+}
+
+double calcu(char op, double operand) {
+    switch (op) {
+        case '!':
+            return factorial(static_cast<int>(operand));
+        case 's': // sin
+            return sin(operand);
+        case 'c': // cos
+            return cos(operand);
+        case 't': // tan
+            return tan(operand);
+        case 'l': // log
+            return log(operand);
+        default:
+            cout << "Error: Unknown function" << endl;
+            exit(-1);
+    }
+}
+
+double evaluate(const string& expr) {
+    Stack<double> opnd(100);
+    Stack<char> optr(100);
+    optr.Push('\0');
+    const char* s = expr.c_str();
+    
+    while (*s) {
+        if (isdigit(*s) || (*s == '.')) {
+            double num = 0;
+            double frac = 0.1;
+            bool hasDecimal = false;
+
+            while (isdigit(*s) || (*s == '.')) {
+                if (*s == '.') {
+                    hasDecimal = true;
+                } else {
+                    if (hasDecimal) {
+                        num += (*s - '0') * frac;
+                        frac *= 0.1;
+                    } else {
+                        num = num * 10 + (*s - '0');
+                    }
                 }
-                op_stack.push(token);
-            } else if (token == "(") {
-                op_stack.push(token);
-            } else if (token == ")") {
-                while (!op_stack.is_empty() && op_stack.peek() != "(") {
-                    output.push_back(op_stack.pop());
+                s++;
+            }
+            opnd.Push(num);
+        } else if (*s == 's' || *s == 'c' || *s == 't' || *s == 'l') {
+            char func = *s;
+            s++; // Skip the function character
+            if (*s != '(') {
+                cout << "Error: Expected '(' after function" << endl;
+                exit(-1);
+            }
+            s++; // Skip '('
+            double operand = evaluate(s);
+            opnd.Push(calcu(func, operand));
+            while (*s != ')') s++; // Skip to ')'
+            s++; // Skip ')'
+        } else {
+            switch (getPriority(optr.Top(), *s)) {
+                case '<':
+                    optr.Push(*s);
+                    s++;
+                    break;
+
+                case '>': {
+                    char op = optr.Pop();
+                    if (op == '!') {
+                        opnd.Push(calcu(op, opnd.Pop()));
+                    } else {
+                        double opnd2 = opnd.Pop();
+                        double opnd1 = opnd.Pop();
+                        opnd.Push(calcu(opnd1, op, opnd2));
+                    }
+                    break;
                 }
-                op_stack.pop();  // Pop the '('
-            } else if (is_function(token)) {
-                output.push_back(token); // Push the function to the output for RPN processing
+
+                case '=':
+                    optr.Pop();
+                    s++;
+                    break;
+                default:
+                    s++;
             }
         }
-
-        while (!op_stack.is_empty()) {
-            output.push_back(op_stack.pop());
-        }
-
-        return evaluate_rpn(output);
     }
+    return opnd.Pop();
+}
 
-protected:
-    struct Operator {
-        int precedence;
-        std::function<double(double, double)> func;
-    };
-
-    std::map<char, Operator> operators;
-
-    int precedence(char op) {
-        return operators[op].precedence;
-    }
-
-    std::vector<std::string> tokenize(const std::string& expression) {
-        std::istringstream iss(expression);
-        std::vector<std::string> tokens;
-        std::string token;
-
-        while (iss >> token) {
-            tokens.push_back(token);
-        }
-        return tokens;
-    }
-
-    double evaluate_rpn(const std::vector<std::string>& rpn) {
-        Stack<double> stack;
-        for (const auto& token : rpn) {
-            if (isdigit(token[0]) || (token.size() > 1 && isdigit(token[1]))) {
-                stack.push(std::stod(token));
-            } else if (operators.count(token[0])) {
-                if (stack.size() < 2) throw std::runtime_error("Insufficient operands for operator");
-                double b = stack.pop();
-                double a = stack.pop();
-                double result = operators[token[0]].func(a, b);
-                stack.push(result);
-            } else if (is_function(token)) {
-                if (stack.is_empty()) throw std::runtime_error("Insufficient operands for function");
-                double a = stack.pop();
-                double result = evaluate_function(token, a);
-                stack.push(result);
-            }
-        }
-        if (stack.size() != 1) throw std::runtime_error("Error in expression evaluation");
-        return stack.pop();
-    }
-
-    bool is_function(const std::string& token) {
-        return token == "sin" || token == "cos" || token == "tan" || token == "log";
-    }
-
-    double evaluate_function(const std::string& func, double a) {
-        if (func == "sin") return std::sin(a);
-        if (func == "cos") return std::cos(a);
-        if (func == "tan") return std::tan(a);
-        if (func == "log") return std::log10(a);  // 使用以10为底的对数
-        throw std::invalid_argument("Unknown function: " + func);
-    }
-};
-
-class AdvancedStringCalculator : public StringCalculator {
-public:
-    double calculate(const std::string& expression) {
-        std::string processed_expression = preprocess(expression);
-        return StringCalculator::calculate(processed_expression);
-    }
-
-private:
-    std::string preprocess(const std::string& expression) {
-        std::string result = expression;
-        replace(result, "pi", std::to_string(M_PI));
-        replace(result, "e", std::to_string(M_E));
-        return result;
-    }
-
-    void replace(std::string& str, const std::string& from, const std::string& to) {
-        size_t start_pos = 0;
-        while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-            str.replace(start_pos, from.length(), to);
-            start_pos += to.length();
-        }
-    }
-};
 
 int main() {
-    AdvancedStringCalculator calc;
+    string expression;
+    cout << "请输入一个数学表达式: ";
+    getline(cin, expression);
+    double result = evaluate(expression);
+    cout << "计算结果: " << result << endl;
 
-    // 测试基本运算
-    std::cout << "3 + 5 * (2 - 8) = " << calc.calculate("3 + 5 * ( 2 - 8 )") << std::endl; // 输出: -27
-    std::cout << "10 + 2 * 6 = " << calc.calculate("10 + 2 * 6") << std::endl;              // 输出: 22
-    std::cout << "100 * 2 + 12 = " << calc.calculate("100 * 2 + 12") << std::endl;          // 输出: 212
-    std::cout << "100 * (2 + 12) = " << calc.calculate("100 * ( 2 + 12 )") << std::endl;    // 输出: 1400
-    std::cout << "100 * (2 + 12) / 14 = " << calc.calculate("100 * ( 2 + 12 ) / 14") << std::endl; // 输出: 100
-
-    // 测试三角函数和对数
-    std::cout << "sin(pi / 2) + 10 * log(100) = " << calc.calculate("sin(pi / 2) + 10 * log(100)") << std::endl; // 应输出: 20
-    std::cout << "cos(0) + 5 = " << calc.calculate("cos(0) + 5") << std::endl;                          // 应输出: 6
-    std::cout << "tan(pi / 4) = " << calc.calculate("tan(pi / 4)") << std::endl;                        // 应输出: 1
+    return 0;
 }
